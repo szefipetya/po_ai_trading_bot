@@ -9,6 +9,8 @@
 #
 #================================================================
 import os
+
+from psutil import net_connections
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 import copy
 import pandas as pd
@@ -53,6 +55,8 @@ class CustomEnv:
         # Create Actor-Critic network model
         self.Actor = Actor_Model(input_shape=self.state_size, action_space = self.action_space.shape[0], lr=self.lr, optimizer = self.optimizer)
         self.Critic = Critic_Model(input_shape=self.state_size, action_space = self.action_space.shape[0], lr=self.lr, optimizer = self.optimizer)
+
+        self.net_worth_history=[]
 
     # create tensorboard writer
     def create_writer(self):
@@ -168,6 +172,10 @@ class CustomEnv:
             Volume = self.df.loc[self.current_step, 'Volume']
 
             # Render the environment to the screen
+            self.net_worth_history.append({
+                'Date':Date,
+                'NetWorth':self.net_worth
+                })
             self.visualization.render(Date, Open, High, Low, Close, Volume, self.net_worth, self.trades)
 
     def get_gaes(self, rewards, dones, values, next_values, gamma = 0.99, lamda = 0.95, normalize=True):
@@ -311,4 +319,4 @@ test_env = CustomEnv(test_df, lookback_window_size=lookback_window_size)
 
 #train_agent(train_env, visualize=False, train_episodes=20000, training_batch_size=500)
 test_agent(test_env, visualize=True, test_episodes=1000)
-Random_games(test_env, visualize=False, train_episodes = 1000)
+#Random_games(test_env, visualize=False, train_episodes = 1000)

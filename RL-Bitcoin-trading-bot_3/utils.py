@@ -62,7 +62,7 @@ class TradingGraph:
         #plt.subplots_adjust(left=0.07, bottom=-0.1, right=0.93, top=0.97, wspace=0, hspace=0)
 
     # Render the environment to the screen
-    def render(self, Date, Open, High, Low, Close, Volume, net_worth, trades):
+    def append_data(self, Date, Open, High, Low, Close, Volume, net_worth, trades):
         # append volume and net_worth to deque list
         self.Volume.append(Volume)
         self.net_worth.append(net_worth)
