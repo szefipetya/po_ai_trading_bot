@@ -231,7 +231,7 @@ def Single_game(env):
             print("net_worth:", env.net_worth)
             break
     print("average_net_worth:", average_net_worth)
-    renderer.render_performance(env)
+    renderer.render_performance_vbt(env)
 
 
 df = pd.read_csv('./pricedata.csv')
@@ -239,8 +239,8 @@ df = df.sort_values('Date')
 df = df[-4000:]
 
 lookback_window_size = 50
-train_df = df[:-2000-lookback_window_size]
-test_df = df[-2000-lookback_window_size:]  # 30 days
+train_df = df[:-500-lookback_window_size]
+test_df = df[-500-lookback_window_size:]  # 30 days
 
 train_env = CustomEnv(train_df, lookback_window_size=lookback_window_size)
 test_env = CustomEnv(test_df, lookback_window_size=lookback_window_size)
