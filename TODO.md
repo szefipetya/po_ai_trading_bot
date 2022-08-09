@@ -3,6 +3,8 @@
  :) Change backtest engine to vectorbt
  :) Make random agent work with the mentioned things above
  - Train an RL agent to work with the components above
+    - imporve reward system
+    - show reward on chart
  - Add technical indicators
  - Add hyperparameter optimization with the help of vectorbt.
  - Find optimal parameters for each currency pair to achieve the best results (ton of calculation)

@@ -156,6 +156,7 @@ class CustomEnv:
         self.df_total_steps = len(self.df)-1
         self.initial_balance = initial_balance
         self.lookback_window_size = lookback_window_size
+        
         self.Render_range = Render_range # render range in visualization
         self.Show_reward = Show_reward # show order reward in rendered visualization
 
