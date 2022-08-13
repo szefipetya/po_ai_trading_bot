@@ -10,17 +10,17 @@
 # ================================================================
 from base64 import encode
 from datetime import datetime
+from locale import normalize
 import pandas as pd
 import numpy as np
 import random
 import copy
 from collections import deque
 # customs
-from Env import Env
 from PerformanceRenderer import PerformanceRenderer
 import os
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-
+from indicators import AddIndicators
 
 from sqlalchemy import false, func, null
 
@@ -46,8 +46,8 @@ class CustomAgent:
         # folder to save models
         self.log_name = datetime.now().strftime("%Y_%m_%d_%H_%M")+"_Crypto_trader"
         
-        # State size contains Market+Orders history for the last lookback_window_size steps
-        self.state_size = (lookback_window_size, 10)
+        # State size contains Market+Orders history for the last lookback_window_size steps#+9 indicators
+        self.state_size = (lookback_window_size, 10+9)
 
         # Neural Networks part bellow
         self.lr = lr
@@ -161,9 +161,9 @@ class CustomAgent:
         
 
 
-class CustomEnv(Env):
+class CustomEnv:
     # A custom Bitcoin trading environment
-    def __init__(self, df, initial_balance=1000, lookback_window_size=50,  Show_reward=False, normalize_value=40000):
+    def __init__(self, df, initial_balance=1000, lookback_window_size=50,  Show_reward=False, Show_indicators=False,  normalize_value=40000):
         # Define action space and state size and other custom parameters
         self.df = df.dropna().reset_index()
         self.df_total_steps = len(self.df)-1
@@ -171,6 +171,7 @@ class CustomEnv(Env):
         self.lookback_window_size = lookback_window_size
 
         self.Show_reward = Show_reward # show order reward in rendered visualization
+        self.Show_indicators = Show_indicators # show main indicators in rendered visualization
 
  
         # Orders history contains the balance, net_worth, crypto_bought, crypto_sold, crypto_held values for the last lookback_window_size steps
@@ -180,15 +181,14 @@ class CustomEnv(Env):
         # Market history contains the OHCL values for the last lookback_window_size prices
         self.lookback_market_history = deque(maxlen=self.lookback_window_size)
 
-        # State size contains Market+Orders history for the last lookback_window_size steps
-        self.state_size = (self.lookback_window_size, 10)
-
-        self.full_market_history = []
-        self.full_orders_history = pd.DataFrame(
-            columns=['Date', 'NetWorth', 'CryptoBought', 'CryptoSold', 'CryptoHeld', 'CurrentPrice', 'Action'])
+        self.indicators_history = deque(maxlen=self.lookback_window_size)
 
         self.normalize_value = normalize_value
 
+        #my things
+        self.full_market_history = []
+        self.full_orders_history = pd.DataFrame(
+            columns=['Date', 'NetWorth', 'CryptoBought', 'CryptoSold', 'CryptoHeld', 'CurrentPrice', 'Action'])
         self.df_entries = pd.DataFrame(columns=['date', 'Boolean'])
         self.df_exits = pd.DataFrame(columns=['date', 'Boolean'])
         self.buy_fee=0.0005
@@ -204,10 +204,7 @@ class CustomEnv(Env):
 
     # Reset the state of the environment to an initial state
     def reset(self, env_steps_size=0):
-        self.visualization = PerformanceRenderer(Show_reward=self.Show_reward) # init visualization
-
         self.trades = deque(maxlen=self.df_total_steps) # limited orders memory for visualization
-
 
         self.balance = self.initial_balance
         self.net_worth = self.initial_balance
@@ -220,7 +217,6 @@ class CustomEnv(Env):
         self.rewards = deque(maxlen=self.df_total_steps)
         self.env_steps_size = env_steps_size
         self.punish_value = 0
-
         if env_steps_size > 0:  # used for training dataset #random frames are selected in the dataframe with size of env_steps_size
             self.start_step = random.randint(
                 self.lookback_window_size, self.df_total_steps - env_steps_size)
@@ -245,9 +241,23 @@ class CustomEnv(Env):
                                                  self.df.loc[current_step,
                                                              'Volume']
                                                  ])
+            self.indicators_history.append(
+                                        [self.df.loc[current_step, 'sma7'] / self.normalize_value,
+                                        self.df.loc[current_step, 'sma25'] / self.normalize_value,
+                                        self.df.loc[current_step, 'sma99'] / self.normalize_value,
+                                        self.df.loc[current_step, 'bb_bbm'] / self.normalize_value,
+                                        self.df.loc[current_step, 'bb_bbh'] / self.normalize_value,
+                                        self.df.loc[current_step, 'bb_bbl'] / self.normalize_value,
+                                        self.df.loc[current_step, 'psar'] / self.normalize_value,
+                                        self.df.loc[current_step, 'MACD'] / 400,
+                                        self.df.loc[current_step, 'RSI'] / 100
+                                        ])
 
         state = np.concatenate(
-            (self.lookback_market_history, self.lookback_orders_history), axis=1)
+            (self.lookback_market_history, self.lookback_orders_history), axis=1) / self.normalize_value
+        state = np.concatenate((state, self.indicators_history), axis=1)
+
+
         return state
 
     # Get the data points for the given current_step
@@ -260,9 +270,20 @@ class CustomEnv(Env):
                                              self.df.loc[self.current_step,
                                                          'Volume']
                                              ])
-        state = np.concatenate(
-            (self.lookback_market_history, self.lookback_orders_history), axis=1)
-        return state
+
+        self.indicators_history.append([self.df.loc[self.current_step, 'sma7'] / self.normalize_value,
+                                    self.df.loc[self.current_step, 'sma25'] / self.normalize_value,
+                                    self.df.loc[self.current_step, 'sma99'] / self.normalize_value,
+                                    self.df.loc[self.current_step, 'bb_bbm'] / self.normalize_value,
+                                    self.df.loc[self.current_step, 'bb_bbh'] / self.normalize_value,
+                                    self.df.loc[self.current_step, 'bb_bbl'] / self.normalize_value,
+                                    self.df.loc[self.current_step, 'psar'] / self.normalize_value,
+                                    self.df.loc[self.current_step, 'MACD'] / 400,
+                                    self.df.loc[self.current_step, 'RSI'] / 100
+                                    ])
+        obs = np.concatenate((self.lookback_market_history, self.lookback_orders_history), axis=1) / self.normalize_value
+        obs = np.concatenate((obs, self.indicators_history), axis=1)
+        return obs
 
     # Execute one time step within the environment
     def step(self, action, isTest=False):
@@ -270,7 +291,6 @@ class CustomEnv(Env):
         self.crypto_bought = 0
         self.crypto_sold = 0
         self.current_step += 1
-        currentDate = self.df.loc[self.current_step, 'Date']
 
         # Set the current price to a random price between open and close
         #  current_price = random.uniform( self.df.loc[self.current_step, 'Open'],    self.df.loc[self.current_step, 'Close'])
@@ -288,9 +308,9 @@ class CustomEnv(Env):
             pass
             if isTest:
                 self.dict_entries[len(self.dict_entries)] = {
-                    'date': currentDate, 'Boolean': False}
+                    'date': Date, 'Boolean': False}
                 self.dict_exits[len(self.dict_exits)] = {
-                    'date': currentDate, 'Boolean': False, }
+                    'date': Date, 'Boolean': False, }
 
         elif action == 1:
             # Buy with 100% of current balance
@@ -299,13 +319,14 @@ class CustomEnv(Env):
             self.balance -= self.crypto_bought * current_price 
             self.crypto_held += self.crypto_bought
             self.trades.append({'Date' : Date, 'High' : High, 'Low' : Low, 'total': self.crypto_bought, 'type': "buy", 'current_price': current_price})
+            self.episode_orders += 1
+
             #visualization
             if isTest:
                 self.dict_entries[len(self.dict_entries)] = {
-                    'date': currentDate, 'Boolean': True}
+                    'date': Date, 'Boolean': True}
                 self.dict_exits[len(self.dict_exits)] = {
-                    'date': currentDate, 'Boolean': False}
-            self.episode_orders += 1
+                    'date': Date, 'Boolean': False}
         
 
         elif action == 2:
@@ -315,25 +336,29 @@ class CustomEnv(Env):
             self.balance += self.crypto_sold * current_price
             self.crypto_held -= self.crypto_sold
             self.trades.append({'Date' : Date, 'High' : High, 'Low' : Low, 'total': self.crypto_sold, 'type': "sell", 'current_price': current_price})
+            self.episode_orders += 1     
+
             #visulaization
             if isTest:
                 self.dict_entries[len(self.dict_entries)] = {
-                    'date': currentDate, 'Boolean': False}
+                    'date': Date, 'Boolean': False}
                 self.dict_exits[len(self.dict_exits)] = {
-                    'date': currentDate, 'Boolean': True}
-            self.episode_orders += 1     
+                    'date': Date, 'Boolean': True}
 
         print('realaction=',action,end=", ")
 
 
         self.prev_net_worth = self.net_worth
         self.net_worth = self.balance + self.crypto_held * current_price
+        # Calculate reward
+
         reward = self.get_reward()
 
         self.lookback_orders_history.append(
             [self.balance, self.net_worth, self.crypto_bought, self.crypto_sold, self.crypto_held])
+        #visulaization
         if isTest:
-            self.dict_full_orders_history[len(self.dict_full_orders_history)] = {'Date': currentDate,
+            self.dict_full_orders_history[len(self.dict_full_orders_history)] = {'Date': Date,
                                                                              'NetWorth': self.net_worth,
                                                                              'CryptoBought': self.crypto_bought,
                                                                              'CryptoSold': self.crypto_sold,
@@ -343,14 +368,13 @@ class CustomEnv(Env):
                                                                              'Reward':reward
                                                                              }
 
-        # Calculate reward
         
         if self.net_worth <= self.initial_balance/2:
             done = True
         else:
             done = False
 
-        state = self._next_observation()/ self.normalize_value
+        state = self._next_observation()
 
         return state, reward, done
 
@@ -384,141 +408,101 @@ class CustomEnv(Env):
     def render(self, visualize):
         print(f'Step: {self.current_step}, Net Worth: {self.net_worth}')
 
-    def prepare_for_render(self):
-        self.construct_dataframes()
+class Interface:
+    def train_agent(env,agent, train_episodes = 50, training_batch_size=500):
+        agent.create_writer(env.initial_balance, env.normalize_value, train_episodes) # create TensorBoard writer
+        total_average = deque(maxlen=100) # save recent 100 episodes net worth
+        best_average = 0 # used to track best average net worth
+        for episode in range(train_episodes):
+            state = env.reset(env_steps_size = training_batch_size)
 
+            states, actions, rewards, predictions, dones, next_states = [], [], [], [], [], []
+            for t in range(training_batch_size):
+                env.render()
+                action, prediction = env.act(state)
+                next_state, reward, done = env.step(action)
+                states.append(np.expand_dims(state, axis=0))
+                next_states.append(np.expand_dims(next_state, axis=0))
+                action_onehot = np.zeros(3)
+                action_onehot[action] = 1
+                actions.append(action_onehot)
+                rewards.append(reward)
+                dones.append(done)
+                predictions.append(prediction)
+                state = next_state
+                print("episode=",episode,end=", ")
 
-def train_agent(env,agent, train_episodes = 50, training_batch_size=500):
-    agent.create_writer(env.initial_balance, env.normalize_value, train_episodes) # create TensorBoard writer
-    total_average = deque(maxlen=100) # save recent 100 episodes net worth
-    best_average = 0 # used to track best average net worth
-    for episode in range(train_episodes):
-        state = env.reset(env_steps_size = training_batch_size)
+            a_loss, c_loss = agent.replay(states, actions, rewards, predictions, dones, next_states)
+            total_average.append(env.net_worth)
+            average = np.average(total_average)
+            print("average net worth: "+str(average),end=", ")
 
-        states, actions, rewards, predictions, dones, next_states = [], [], [], [], [], []
-        for t in range(training_batch_size):
-            env.render()
-            action, prediction = env.act(state)
-            next_state, reward, done = env.step(action)
-            states.append(np.expand_dims(state, axis=0))
-            next_states.append(np.expand_dims(next_state, axis=0))
-            action_onehot = np.zeros(3)
-            action_onehot[action] = 1
-            actions.append(action_onehot)
-            rewards.append(reward)
-            dones.append(done)
-            predictions.append(prediction)
-            state = next_state
-            print("episode=",episode,end=", ")
-
-        a_loss, c_loss = agent.replay(states, actions, rewards, predictions, dones, next_states)
-        total_average.append(env.net_worth)
-        average = np.average(total_average)
-        print("average net worth: "+str(average),end=", ")
-
-        agent.writer.add_scalar('Data/average net_worth', average, episode)
-        agent.writer.add_scalar('Data/episode_orders', env.episode_orders, episode)
-      
-        print("episode: {:<5} net worth {:<7.2f} average: {:<7.2f} orders: {}".format(episode, env.net_worth, average, env.episode_orders))
-        if episode > len(total_average):
-            if best_average < average:
-                best_average = average
-                print("Saving model")
-                agent.save(score="{:.2f}".format(best_average), args=[episode, average, env.episode_orders, a_loss, c_loss])
-            agent.save()
-            
-    agent.end_training_log()
-
-
-def test_agent(env, agent, visualize=True, test_episodes=10, folder="", name="Crypto_trader", comment=""):
-    agent.load(folder, name)
-    average_net_worth = 0
-    average_orders = 0
-    no_profit_episodes = 0
-    for episode in range(test_episodes):
-        state = env.reset(env_steps_size=0)
-        while True:
-            env.render(visualize)
-            action, prediction = agent.act(state)
-            state, reward, done = env.step(action,isTest=True)
-
-            if env.current_step == env.end_step:
-                average_net_worth += env.net_worth
-                average_orders += env.episode_orders
-                if env.net_worth < env.initial_balance: no_profit_episodes += 1 # calculate episode count where we had negative profit through episode
-                print("episode: {:<5}, net_worth: {:<7.2f}, average_net_worth: {:<7.2f}, orders: {}".format(episode, env.net_worth, average_net_worth/(episode+1), env.episode_orders))
-                break
+            agent.writer.add_scalar('Data/average net_worth', average, episode)
+            agent.writer.add_scalar('Data/episode_orders', env.episode_orders, episode)
         
-           
-
-    print("average {} episodes agent net_worth: {}, orders: {}".format(test_episodes, average_net_worth/test_episodes, average_orders/test_episodes))
-    print("No profit episodes: {}".format(no_profit_episodes))
-    # save test results to test_results.txt file
-    with open("test_results.txt", "a+") as results:
-        current_date = datetime.now().strftime('%Y-%m-%d %H:%M')
-        results.write(f'{current_date}, {name}, test episodes:{test_episodes}')
-        results.write(f', net worth:{average_net_worth/(episode+1)}, orders per episode:{average_orders/test_episodes}')
-        results.write(f', no profit episodes:{no_profit_episodes}, model: {agent.model}, comment: {comment}\n')
-    renderer.render_performance(env)
-
-def Random_games(env, train_episodes=50, train_mode=False, training_batch_size=500):
-    average_net_worth = 0
-
-    for episode in range(train_episodes):
-        state = env.reset(env_steps_size=training_batch_size)
-
-        while True:
-            env.render(False)
-
-            action = np.random.randint(3, size=1)[0]
-
-            state, reward, done = env.step(action)
-
-            if env.current_step == env.end_step:
-                average_net_worth += env.net_worth
-                print("net_worth:", env.net_worth)
-                break
-
-    print("average_net_worth:", average_net_worth/train_episodes)
+            print("episode: {:<5} net worth {:<7.2f} average: {:<7.2f} orders: {}".format(episode, env.net_worth, average, env.episode_orders))
+            if episode > len(total_average):
+                if best_average < average:
+                    best_average = average
+                    print("Saving model")
+                    agent.save(score="{:.2f}".format(best_average), args=[episode, average, env.episode_orders, a_loss, c_loss])
+                agent.save()
+                
+        agent.end_training_log()
 
 
-def Single_game(env):
-    state = env.reset()
-    average_net_worth = 0
+    def test_agent(env, agent, visualize=True, test_episodes=10, folder="", name="Crypto_trader", comment=""):
+        agent.load(folder, name)
+        average_net_worth = 0
+        average_orders = 0
+        no_profit_episodes = 0
+        for episode in range(test_episodes):
+            state = env.reset()
+            while True:
+                env.render(visualize)
+                action, prediction = agent.act(state)
+                state, reward, done = env.step(action,isTest=True)
+                if env.current_step == env.end_step:
+                    average_net_worth += env.net_worth
+                    average_orders += env.episode_orders
+                    if env.net_worth < env.initial_balance: no_profit_episodes += 1 # calculate episode count where we had negative profit through episode
+                    print("episode: {:<5}, net_worth: {:<7.2f}, average_net_worth: {:<7.2f}, orders: {}".format(episode, env.net_worth, average_net_worth/(episode+1), env.episode_orders))
+                    break
 
-    while True:
-        env.render()
+        print("average {} episodes agent net_worth: {}, orders: {}".format(test_episodes, average_net_worth/test_episodes, average_orders/test_episodes))
+        print("No profit episodes: {}".format(no_profit_episodes))
+        # save test results to test_results.txt file
+        with open("test_results.txt", "a+") as results:
+            current_date = datetime.now().strftime('%Y-%m-%d %H:%M')
+            results.write(f'{current_date}, {name}, test episodes:{test_episodes}')
+            results.write(f', net worth:{average_net_worth/(episode+1)}, orders per episode:{average_orders/test_episodes}')
+            results.write(f', no profit episodes:{no_profit_episodes}, model: {agent.model}, comment: {comment}\n')
+        env.construct_dataframes()
 
-        action = np.random.randint(3, size=1)[0]
+        #renderer.render_performance(env, env.Show_indicators)
 
-        state, reward, done = env.step(action,True)
+# if __name__ == "__main__":      
+#     df = pd.read_csv('./pricedata.csv')
+#     df = df.sort_values('Date')
+#     df= AddIndicators(df)
+#     lookback_window_size = 50
+#     test_window =720
+#     train_df = df[:-test_window-lookback_window_size]
+#     test_df = df[-test_window-lookback_window_size:]  # 30 days
+#     agent = CustomAgent(lookback_window_size=lookback_window_size, lr=0.00001, epochs=5, optimizer=Adam, batch_size = 32, model="Dense")
+#     #train_env = CustomEnv(train_df, lookback_window_size=lookback_window_size)
+#     #train_agent(train_env, agent, visualize=False, train_episodes=50000, training_batch_size=500)
 
-        if env.current_step == env.end_step:
-            average_net_worth += env.net_worth
-            print("net_worth:", env.net_worth)
-            break
-    print("average_net_worth:", average_net_worth)
-    renderer.render_performance_vbt(env)
+#     test_env = CustomEnv(test_df, lookback_window_size=lookback_window_size, Show_reward=True, Show_indicators=True)
+#     test_agent(test_env, agent, visualize=False, test_episodes=1, folder="2021_01_18_22_18_Crypto_trader", name="1933.71_Crypto_trader", comment="")
+    
 
-if __name__ == "__main__":      
-    df = pd.read_csv('./pricedata_long.csv')
-    df = df.sort_values('Date')
+#     #agent = CustomAgent(lookback_window_size=lookback_window_size, lr=0.00001, epochs=1, optimizer=Adam, batch_size = 32, model="CNN")
+#     #test_env = CustomEnv(test_df, lookback_window_size=lookback_window_size, Show_reward=False)
+#     #test_agent(test_env, agent, visualize=False, test_episodes=1, folder="2021_01_11_23_48_Crypto_trader", name="1772.66_Crypto_trader", comment="")
+#     #test_agent(test_env, agent, visualize=False, test_episodes=1, folder="2021_01_11_23_48_Crypto_trader", name="1377.86_Crypto_trader", comment="")
 
-    lookback_window_size = 50
-    test_window =1000
-    train_df = df[:-test_window-lookback_window_size]
-    test_df = df[-test_window-lookback_window_size:]  # 30 days
-    agent = CustomAgent(lookback_window_size=lookback_window_size, lr=0.00001, epochs=1, optimizer=Adam, batch_size = 32, model="Dense")
-   # train_agent(train_env, agent, visualize=False, train_episodes=50000, training_batch_size=500)
-    test_env = CustomEnv(test_df, lookback_window_size=lookback_window_size, Show_reward=False)
-    test_agent(test_env, agent, visualize=False, test_episodes=1, folder="2021_01_11_13_32_Crypto_trader", name="1277.39_Crypto_trader", comment="")
-
-    #agent = CustomAgent(lookback_window_size=lookback_window_size, lr=0.00001, epochs=1, optimizer=Adam, batch_size = 32, model="CNN")
-    #test_env = CustomEnv(test_df, lookback_window_size=lookback_window_size, Show_reward=False)
-    #test_agent(test_env, agent, visualize=False, test_episodes=1, folder="2021_01_11_23_48_Crypto_trader", name="1772.66_Crypto_trader", comment="")
-    #test_agent(test_env, agent, visualize=False, test_episodes=1, folder="2021_01_11_23_48_Crypto_trader", name="1377.86_Crypto_trader", comment="")
-
-    #agent = CustomAgent(lookback_window_size=lookback_window_size, lr=0.00001, epochs=1, optimizer=Adam, batch_size = 128, model="LSTM")
-    #test_env = CustomEnv(test_df, lookback_window_size=lookback_window_size, Show_reward=False)
-    #test_agent(test_env, agent, visualize=False, test_episodes=1, folder="2021_01_11_23_43_Crypto_trader", name="1076.27_Crypto_trader", comment="")
+#     #agent = CustomAgent(lookback_window_size=lookback_window_size, lr=0.00001, epochs=1, optimizer=Adam, batch_size = 128, model="LSTM")
+#     #test_env = CustomEnv(test_df, lookback_window_size=lookback_window_size, Show_reward=False)
+#     #test_agent(test_env, agent, visualize=False, test_episodes=1, folder="2021_01_11_23_43_Crypto_trader", name="1076.27_Crypto_trader", comment="")
 

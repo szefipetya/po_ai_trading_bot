@@ -440,5 +440,5 @@ if __name__ == "__main__":
     #train_agent(train_env, agent, visualize=False, train_episodes=50000, training_batch_size=500)
 
     test_env = CustomEnv(test_df, lookback_window_size=lookback_window_size, Show_reward=True, Show_indicators=True)
-    test_agent(test_env, agent, visualize=True, test_episodes=10, folder="2021_01_18_22_18_Crypto_trader", name="1933.71_Crypto_trader", comment="")
+    test_agent(test_env, agent, visualize=False, test_episodes=10, folder="2021_01_18_22_18_Crypto_trader", name="1933.71_Crypto_trader", comment="")
     
