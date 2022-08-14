@@ -1,4 +1,5 @@
 *.dll
 *.exe
-nvcc.profile
+nvccprofile
 *nvvp.bat
+*.h5

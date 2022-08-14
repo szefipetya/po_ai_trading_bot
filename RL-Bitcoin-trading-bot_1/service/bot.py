@@ -17,7 +17,6 @@ import random
 import copy
 from collections import deque
 # customs
-from PerformanceRenderer import PerformanceRenderer
 import os
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 from indicators import AddIndicators
@@ -31,8 +30,7 @@ from model import Actor_Model, Critic_Model, Shared_Model
 from utils import Write_to_file
 
 
-# globals
-renderer = PerformanceRenderer()
+
 TIME_FORMAT = '%Y-%m-%d  %H:%M'
 class CustomAgent:
     # A custom Bitcoin trading agent
