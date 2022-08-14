@@ -149,7 +149,7 @@ const userAction = async () => {
                 color: Object.values(full_orders_history["Action"]).map((x) => {
                     if(x==1) return "green"
                     if(x==2) return "red"
-                    if(x==0) return "transparent"
+                    if(x==0) return ""
                 }),
                 opacity: Object.values(full_orders_history["Action"]).map((x) => {
                     if(x==0) return 0;
@@ -182,7 +182,7 @@ const userAction = async () => {
               rangeslider: {
                    visible: false
                },
-               range:[Object.values(full_orders_history['Date'])[300],Object.values(full_orders_history['Date'])[718]]
+               range:[Object.values(full_orders_history['Date'])[1500],Object.values(full_orders_history['Date'])[2100]]
             },
             yaxis: {
                 title: 'yaxis title',

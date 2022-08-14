@@ -1,0 +1,4 @@
+*.dll
+*.exe
+nvcc.profile
+*nvvp.bat

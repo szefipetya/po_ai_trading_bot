@@ -16,7 +16,6 @@ app.add_middleware(
 service = Service()
 @app.on_event("startup")
 async def startup_event():
-   
     service.run()
 
 @app.get("/df")

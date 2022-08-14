@@ -151,7 +151,10 @@ class CustomAgent:
         if len(args) > 0:
             with open(f"{self.log_name}/log.txt", "a+") as log:
                 current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                log.write(f"{current_time}, {args[0]}, {args[1]}, {args[2]}, {args[3]}, {args[4]}\n")
+                atgumets = ""
+                for arg in args:
+                    atgumets += f", {arg}"
+                log.write(f"{current_time}{atgumets}\n")
 
     def load(self, folder, name):
         # load keras model weights
@@ -287,7 +290,7 @@ class CustomEnv:
 
     # Execute one time step within the environment
     def step(self, action, isTest=False):
-        print('action=',action,end=", ")
+       # print('action=',action,end=", ")
         self.crypto_bought = 0
         self.crypto_sold = 0
         self.current_step += 1
@@ -345,7 +348,7 @@ class CustomEnv:
                 self.dict_exits[len(self.dict_exits)] = {
                     'date': Date, 'Boolean': True}
 
-        print('realaction=',action,end=", ")
+      #  print('realaction=',action,end=", ")
 
 
         self.prev_net_worth = self.net_worth
@@ -376,7 +379,7 @@ class CustomEnv:
 
         state = self._next_observation()
 
-        return state, reward, done
+        return state, reward, action, done, Date, current_price
 
     def get_reward(self):
         self.punish_value += self.net_worth * 0.00001
