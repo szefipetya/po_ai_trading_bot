@@ -107,3 +107,8 @@
 2022-08-14 01:09, 1984.93_Crypto_trader, test episodes:1, net worth:521.8725396183513, orders per episode:243.0, no profit episodes:0, comment: Dense
 2022-08-14 01:10, 1984.93_Crypto_trader, test episodes:1, net worth:624.6171350781347, orders per episode:247.0, no profit episodes:0, comment: Dense
 2022-08-14 01:33, 1984.93_Crypto_trader, test episodes:1, net worth:590.1204738534058, orders per episode:209.0, no profit episodes:0, comment: Dense
+2022-08-14 17:02, 3447.20_Crypto_trader, test episodes:1, net worth:500.0, orders per episode:888.0, no profit episodes:0, comment: 3 months
+2022-08-14 17:04, 3447.20_Crypto_trader, test episodes:20, net worth:952.3809523809524, orders per episode:901.05, no profit episodes:0, comment: 3 months
+2022-08-14 17:05, 3447.20_Crypto_trader, test episodes:20, net worth:1095.5962862798735, orders per episode:570.5, no profit episodes:2, comment: 3 months
+2022-08-14 17:07, 3447.20_Crypto_trader, test episodes:1, net worth:513.9044445659846, orders per episode:575.0, no profit episodes:0, comment: 3 months
+2022-08-14 17:09, 3447.20_Crypto_trader, test episodes:1, net worth:612.7595812862409, orders per episode:583.0, no profit episodes:0, comment: 3 months

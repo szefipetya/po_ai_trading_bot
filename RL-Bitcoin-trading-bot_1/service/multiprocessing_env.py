@@ -13,6 +13,8 @@ from multiprocessing import Process, Pipe
 import numpy as np
 from datetime import datetime
 import pandas as pd
+import json
+from tensorflow.keras.optimizers import Adam
 
 class Environment(Process):
     def __init__(self, env_idx, child_conn, env, training_batch_size, visualize, isTest=False):
@@ -23,7 +25,6 @@ class Environment(Process):
         self.training_batch_size = training_batch_size
         self.visualize = visualize
         self.isTest=isTest
-        self.isClosed=False
 
     def run(self):
         super(Environment, self).run()
@@ -32,8 +33,8 @@ class Environment(Process):
         while True :
             reset, net_worth, episode_orders = 0, 0, 0
             action = self.child_conn.recv()
-            if self.env_idx == 0:
-                self.env.render(self.visualize)
+            #if self.env_idx == 0:
+            #   self.env.render(self.visualize)
             state, reward, realaction, done, date, currentprice = self.env.step(action,isTest=self.isTest)
             net_worth = self.env.net_worth
             if done or self.env.current_step == self.env.end_step:
@@ -43,7 +44,7 @@ class Environment(Process):
 
             self.child_conn.send([state, reward, realaction, done, reset, net_worth, episode_orders, date, currentprice])
 
-def train_multiprocessing(CustomEnv, agent, train_df, num_worker=4, training_batch_size=500, visualize=False, EPISODES=10000):
+def train_multiprocessing(CustomEnv, agent, train_df, train_df_nomalized, num_worker=4, training_batch_size=500, visualize=False, EPISODES=10000):
     works, parent_conns, child_conns = [], [], []
     episode = 0
     total_average = deque(maxlen=100) # save recent 100 episodes net worth
@@ -51,7 +52,7 @@ def train_multiprocessing(CustomEnv, agent, train_df, num_worker=4, training_bat
 
     for idx in range(num_worker):
         parent_conn, child_conn = Pipe()
-        env = CustomEnv(train_df, lookback_window_size=agent.lookback_window_size)
+        env = CustomEnv(train_df,train_df_nomalized, lookback_window_size=agent.lookback_window_size)
         work = Environment(idx, child_conn, env, training_batch_size, visualize)
         work.start()
         works.append(work)
@@ -114,7 +115,7 @@ def train_multiprocessing(CustomEnv, agent, train_df, num_worker=4, training_bat
                 dones[worker_id] = []
                 predictions[worker_id] = []
 
-    agent.end_training_log()
+    #agent.end_training_log()
     # terminating processes after while loop
     works.append(work)
     for work in works:
@@ -122,7 +123,17 @@ def train_multiprocessing(CustomEnv, agent, train_df, num_worker=4, training_bat
         print('TERMINATED:', work)
         work.join()
 
-def test_multiprocessing(CustomEnv, agent, test_df, num_worker = 4, visualize=False, test_episodes=1000, folder="", name="Crypto_trader", comment="", initial_balance=1000):
+def test_multiprocessing(CustomEnv, CustomAgent, test_df,test_df_nomalized, num_worker = 4, visualize=False, test_episodes=1000, folder="", name="Crypto_trader", comment="", initial_balance=1000):
+    
+ with open(folder+"/Parameters.json", "r") as json_file:
+    params = json.load(json_file)
+    if name != "":
+        params["Actor name"] = f"{name}_Actor.h5"
+        params["Critic name"] = f"{name}_Critic.h5"
+    name = params["Actor name"][:-9]
+
+    agent = CustomAgent(lookback_window_size=params["lookback window size"], optimizer=Adam, depth=params["depth"], model=params["model"])
+
     agent.load(folder, name)
     works, parent_conns, child_conns = [], [], []
     average_net_worth = 0
@@ -137,7 +148,9 @@ def test_multiprocessing(CustomEnv, agent, test_df, num_worker = 4, visualize=Fa
 
     for idx in range(num_worker):
         parent_conn, child_conn = Pipe()
-        env = CustomEnv(test_df, initial_balance=initial_balance, lookback_window_size=agent.lookback_window_size)
+        #env = CustomEnv(test_df, initial_balance=initial_balance, lookback_window_size=agent.lookback_window_size)
+        env = CustomEnv(df=test_df, df_normalized=test_df_nomalized, initial_balance=initial_balance, lookback_window_size=agent.lookback_window_size)
+
         work = Environment(idx, child_conn, env, training_batch_size=0, visualize=visualize, isTest=True)
         work.start()
         works.append(work)
@@ -193,13 +206,9 @@ def test_multiprocessing(CustomEnv, agent, test_df, num_worker = 4, visualize=Fa
          } 
         dfs.append(work.env.df)
         order_dfs.append( pd.DataFrame.from_dict(dict))
-        work.isClosed=True
         work.terminate()
         print('TERMINATED:', work)
-
-        work.join()
-        
-       
+        work.join()  
 
     print("FINISHED")
     return dfs, order_dfs

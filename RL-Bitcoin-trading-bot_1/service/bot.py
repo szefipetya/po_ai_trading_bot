@@ -20,24 +20,27 @@ from collections import deque
 import os
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 from indicators import AddIndicators
-
-from sqlalchemy import false, func, null
-
 from tensorboardX import SummaryWriter
 from tensorflow.keras.optimizers import Adam, RMSprop
 
 from model import Actor_Model, Critic_Model, Shared_Model
 from utils import Write_to_file
+import json
+
+#import tensorflow as tf
+#gpus = tf.config.experimental.list_physical_devices('GPU')
+#for gpu in gpus:
+ # tf.config.experimental.set_memory_growth(gpu, True)
 
 
 
-TIME_FORMAT = '%Y-%m-%d  %H:%M'
 class CustomAgent:
     # A custom Bitcoin trading agent
-    def __init__(self, lookback_window_size=50, lr=0.00005, epochs=1, optimizer=Adam, batch_size=32, model=""):
+    def __init__(self, lookback_window_size=50, lr=0.00005, epochs=1, optimizer=Adam, batch_size=32, model="", depth=0, comment=""):
         self.lookback_window_size = lookback_window_size
         self.model = model
-        
+        self.comment = comment
+        self.depth = depth
         # Action space from 0 to 3, 0 is hold, 1 is buy, 2 is sell
         self.action_space = np.array([0, 1, 2])
 
@@ -45,7 +48,7 @@ class CustomAgent:
         self.log_name = datetime.now().strftime("%Y_%m_%d_%H_%M")+"_Crypto_trader"
         
         # State size contains Market+Orders history for the last lookback_window_size steps#+9 indicators
-        self.state_size = (lookback_window_size, 10+9)
+        self.state_size = (lookback_window_size, 5+depth) # 5 standard OHCL information + market and indicators
 
         # Neural Networks part bellow
         self.lr = lr
@@ -72,22 +75,30 @@ class CustomAgent:
             
     def start_training_log(self, initial_balance, normalize_value, train_episodes):      
         # save training parameters to Parameters.txt file for future
-        with open(self.log_name+"/Parameters.txt", "w") as params:
-            current_date = datetime.now().strftime('%Y-%m-%d %H:%M')
-            params.write(f"training start: {current_date}\n")
-            params.write(f"initial_balance: {initial_balance}\n")
-            params.write(f"training episodes: {train_episodes}\n")
-            params.write(f"lookback_window_size: {self.lookback_window_size}\n")
-            params.write(f"lr: {self.lr}\n")
-            params.write(f"epochs: {self.epochs}\n")
-            params.write(f"batch size: {self.batch_size}\n")
-            params.write(f"normalize_value: {normalize_value}\n")
-            params.write(f"model: {self.model}\n")
-            
-    def end_training_log(self):
-        with open(self.log_name+"/Parameters.txt", "a+") as params:
-            current_date = datetime.now().strftime('%Y-%m-%d %H:%M')
-            params.write(f"training end: {current_date}\n")
+        current_date = datetime.now().strftime('%Y-%m-%d %H:%M')
+        params = {
+            "training start": current_date,
+            "initial balance": initial_balance,
+            "training episodes": train_episodes,
+            "lookback window size": self.lookback_window_size,
+            "depth": self.depth,
+            "lr": self.lr,
+            "epochs": self.epochs,
+            "batch size": self.batch_size,
+            "normalize value": normalize_value,
+            "model": self.model,
+            "comment": self.comment,
+            "saving time": "",
+            "Actor name": "",
+            "Critic name": "",
+        }
+        with open(self.log_name+"/Parameters.json", "w") as write_file:
+            json.dump(params, write_file, indent=4)
+
+    # def end_training_log(self):
+    #     with open(self.log_name+"/Parameters.txt", "a+") as params:
+    #         current_date = datetime.now().strftime('%Y-%m-%d %H:%M')
+    #         params.write(f"training end: {current_date}\n")
 
     def get_gaes(self, rewards, dones, values, next_values, gamma = 0.99, lamda = 0.95, normalize=True):
         deltas = [r + gamma * (1 - d) * nv - v for r, d, nv, v in zip(rewards, dones, next_values, values)]
@@ -125,8 +136,8 @@ class CustomAgent:
         y_true = np.hstack([advantages, predictions, actions])
         
         # training Actor and Critic networks
-        a_loss = self.Actor.Actor.fit(states, y_true, epochs=self.epochs, verbose=0, shuffle=True, batch_size=self.batch_size)
-        c_loss = self.Critic.Critic.fit(states, target, epochs=self.epochs, verbose=0, shuffle=True, batch_size=self.batch_size)
+        a_loss = self.Actor.Actor.fit(states, y_true, epochs=self.epochs, verbose=0, shuffle=True, batch_size=self.batch_size, use_multiprocessing = True)
+        c_loss = self.Critic.Critic.fit(states, target, epochs=self.epochs, verbose=0, shuffle=True, batch_size=self.batch_size, use_multiprocessing = True)
 
         self.writer.add_scalar('Data/actor_loss_per_replay', np.sum(a_loss.history['loss']), self.replay_count)
         self.writer.add_scalar('Data/critic_loss_per_replay', np.sum(c_loss.history['loss']), self.replay_count)
@@ -145,14 +156,23 @@ class CustomAgent:
         self.Actor.Actor.save_weights(f"{self.log_name}/{score}_{name}_Actor.h5")
         self.Critic.Critic.save_weights(f"{self.log_name}/{score}_{name}_Critic.h5")
 
-        # log saved model arguments to file
+        # update json file settings
+        if score != "":
+            with open(self.log_name+"/Parameters.json", "r") as json_file:
+                params = json.load(json_file)
+            params["saving time"] = datetime.now().strftime('%Y-%m-%d %H:%M')
+            params["Actor name"] = f"{score}_{name}_Actor.h5"
+            params["Critic name"] = f"{score}_{name}_Critic.h5"
+            with open(self.log_name+"/Parameters.json", "w") as write_file:
+                json.dump(params, write_file, indent=4)
+
         if len(args) > 0:
             with open(f"{self.log_name}/log.txt", "a+") as log:
                 current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                atgumets = ""
+                arguments = ""
                 for arg in args:
-                    atgumets += f", {arg}"
-                log.write(f"{current_time}{atgumets}\n")
+                    arguments += f", {arg}"
+                log.write(f"{current_time}{arguments}\n")
 
     def load(self, folder, name):
         # load keras model weights
@@ -164,13 +184,14 @@ class CustomAgent:
 
 class CustomEnv:
     # A custom Bitcoin trading environment
-    def __init__(self, df, initial_balance=1000, lookback_window_size=50,  Show_reward=False, Show_indicators=False,  normalize_value=40000):
+    def __init__(self, df, df_normalized, initial_balance=1000, lookback_window_size=50,  Show_reward=False, Show_indicators=False,  normalize_value=40000):
         # Define action space and state size and other custom parameters
         self.df = df.dropna().reset_index()
+        self.df_normalized = df_normalized.reset_index()#.reset_index()#.copy().dropna().reset_index()
         self.df_total_steps = len(self.df)-1
         self.initial_balance = initial_balance
         self.lookback_window_size = lookback_window_size
-
+        #self.Render_range = Render_range # render range in visualization
         self.Show_reward = Show_reward # show order reward in rendered visualization
         self.Show_indicators = Show_indicators # show main indicators in rendered visualization
 
@@ -182,9 +203,14 @@ class CustomEnv:
         # Market history contains the OHCL values for the last lookback_window_size prices
         self.lookback_market_history = deque(maxlen=self.lookback_window_size)
 
-        self.indicators_history = deque(maxlen=self.lookback_window_size)
+        #self.indicators_history = deque(maxlen=self.lookback_window_size)
 
         self.normalize_value = normalize_value
+        self.buy_fee=0.001
+        self.sell_fee=0.001
+
+        self.columns = list(self.df_normalized.columns[2:])
+
 
         #my things
         self.full_market_history = []
@@ -192,8 +218,7 @@ class CustomEnv:
             columns=['Date', 'NetWorth', 'CryptoBought', 'CryptoSold', 'CryptoHeld', 'CurrentPrice', 'Action'])
         self.df_entries = pd.DataFrame(columns=['date', 'Boolean'])
         self.df_exits = pd.DataFrame(columns=['date', 'Boolean'])
-        self.buy_fee=0.0005
-        self.sell_fee=0.0005
+
 
         # for append optimization
         self.dict_full_orders_history = {}
@@ -205,6 +230,7 @@ class CustomEnv:
 
     # Reset the state of the environment to an initial state
     def reset(self, env_steps_size=0):
+        
         self.trades = deque(maxlen=self.df_total_steps) # limited orders memory for visualization
 
         self.balance = self.initial_balance
@@ -213,7 +239,7 @@ class CustomEnv:
         self.crypto_held = 0
         self.crypto_sold = 0
         self.crypto_bought = 0
-        self.episode_orders = 0 # test
+        self.episode_orders = 0 #  track episode orders count
         self.prev_episode_orders = 0 # track previous episode orders count
         self.rewards = deque(maxlen=self.df_total_steps)
         self.env_steps_size = env_steps_size
@@ -231,59 +257,24 @@ class CustomEnv:
         # fill out the lookback window with data
         for i in reversed(range(self.lookback_window_size)):
             current_step = self.current_step - i
-            self.lookback_orders_history.append(
-                [self.balance, self.net_worth, self.crypto_bought, self.crypto_sold, self.crypto_held])
-            self.lookback_market_history.append([self.df.loc[current_step, 'Open'],
-                                                 self.df.loc[current_step,
-                                                             'High'],
-                                                 self.df.loc[current_step, 'Low'],
-                                                 self.df.loc[current_step,
-                                                             'Close'],
-                                                 self.df.loc[current_step,
-                                                             'Volume']
-                                                 ])
-            self.indicators_history.append(
-                                        [self.df.loc[current_step, 'sma7'] / self.normalize_value,
-                                        self.df.loc[current_step, 'sma25'] / self.normalize_value,
-                                        self.df.loc[current_step, 'sma99'] / self.normalize_value,
-                                        self.df.loc[current_step, 'bb_bbm'] / self.normalize_value,
-                                        self.df.loc[current_step, 'bb_bbh'] / self.normalize_value,
-                                        self.df.loc[current_step, 'bb_bbl'] / self.normalize_value,
-                                        self.df.loc[current_step, 'psar'] / self.normalize_value,
-                                        self.df.loc[current_step, 'MACD'] / 400,
-                                        self.df.loc[current_step, 'RSI'] / 100
+            self.lookback_orders_history.append([self.balance / self.normalize_value,
+                                        self.net_worth / self.normalize_value,
+                                        self.crypto_bought / self.normalize_value,
+                                        self.crypto_sold / self.normalize_value,
+                                        self.crypto_held / self.normalize_value
                                         ])
+            self.lookback_market_history.append([self.df_normalized.loc[current_step, column] for column in self.columns])
 
-        state = np.concatenate(
-            (self.lookback_market_history, self.lookback_orders_history), axis=1) / self.normalize_value
-        state = np.concatenate((state, self.indicators_history), axis=1)
-
+        state = np.concatenate( (self.lookback_orders_history, self.lookback_market_history), axis=1) 
+        #state = np.concatenate((state, self.indicators_history), axis=1)
 
         return state
 
     # Get the data points for the given current_step
     def _next_observation(self):
-        self.lookback_market_history.append([self.df.loc[self.current_step, 'Open'],
-                                             self.df.loc[self.current_step, 'High'],
-                                             self.df.loc[self.current_step, 'Low'],
-                                             self.df.loc[self.current_step,
-                                                         'Close'],
-                                             self.df.loc[self.current_step,
-                                                         'Volume']
-                                             ])
-
-        self.indicators_history.append([self.df.loc[self.current_step, 'sma7'] / self.normalize_value,
-                                    self.df.loc[self.current_step, 'sma25'] / self.normalize_value,
-                                    self.df.loc[self.current_step, 'sma99'] / self.normalize_value,
-                                    self.df.loc[self.current_step, 'bb_bbm'] / self.normalize_value,
-                                    self.df.loc[self.current_step, 'bb_bbh'] / self.normalize_value,
-                                    self.df.loc[self.current_step, 'bb_bbl'] / self.normalize_value,
-                                    self.df.loc[self.current_step, 'psar'] / self.normalize_value,
-                                    self.df.loc[self.current_step, 'MACD'] / 400,
-                                    self.df.loc[self.current_step, 'RSI'] / 100
-                                    ])
-        obs = np.concatenate((self.lookback_market_history, self.lookback_orders_history), axis=1) / self.normalize_value
-        obs = np.concatenate((obs, self.indicators_history), axis=1)
+        self.lookback_market_history.append([self.df_normalized.loc[self.current_step, column] for column in self.columns])
+        obs = np.concatenate((self.lookback_orders_history, self.lookback_market_history), axis=1)
+        
         return obs
 
     # Execute one time step within the environment
@@ -300,51 +291,51 @@ class CustomEnv:
         High = self.df.loc[self.current_step, 'High'] # for visualization
         Low = self.df.loc[self.current_step, 'Low'] # for visualization
 
-        if action == 1 and self.balance <= 0.00000000001:
+        if action == 1 and self.balance <= self.initial_balance*0.05:
             action = 0
-        if action == 2 and self.crypto_held <= 0:
+        if action == 2 and self.crypto_held*current_price <= self.initial_balance*0.05:
             action = 0
 
         if action == 0:  # Hold
             pass
-            if isTest:
-                self.dict_entries[len(self.dict_entries)] = {
-                    'date': Date, 'Boolean': False}
-                self.dict_exits[len(self.dict_exits)] = {
-                    'date': Date, 'Boolean': False, }
+            # if isTest:
+            #     self.dict_entries[len(self.dict_entries)] = {
+            #         'date': Date, 'Boolean': False}
+            #     self.dict_exits[len(self.dict_exits)] = {
+            #         'date': Date, 'Boolean': False, }
 
         elif action == 1:
             # Buy with 100% of current balance
-            self.balance=self.balance-self.balance*self.buy_fee
             self.crypto_bought = self.balance / current_price 
+            self.crypto_bought *= (1-self.buy_fee) # substract fees
             self.balance -= self.crypto_bought * current_price 
             self.crypto_held += self.crypto_bought
             self.trades.append({'Date' : Date, 'High' : High, 'Low' : Low, 'total': self.crypto_bought, 'type': "buy", 'current_price': current_price})
             self.episode_orders += 1
 
             #visualization
-            if isTest:
-                self.dict_entries[len(self.dict_entries)] = {
-                    'date': Date, 'Boolean': True}
-                self.dict_exits[len(self.dict_exits)] = {
-                    'date': Date, 'Boolean': False}
+            # if isTest:
+            #     self.dict_entries[len(self.dict_entries)] = {
+            #         'date': Date, 'Boolean': True}
+            #     self.dict_exits[len(self.dict_exits)] = {
+            #         'date': Date, 'Boolean': False}
         
 
         elif action == 2:
             # Sell 100% of current crypto held
-            self.balance=self.balance-self.balance*self.sell_fee
             self.crypto_sold = self.crypto_held
+            self.crypto_sold *= (1-self.sell_fee) # substract fees
             self.balance += self.crypto_sold * current_price
             self.crypto_held -= self.crypto_sold
             self.trades.append({'Date' : Date, 'High' : High, 'Low' : Low, 'total': self.crypto_sold, 'type': "sell", 'current_price': current_price})
             self.episode_orders += 1     
 
             #visulaization
-            if isTest:
-                self.dict_entries[len(self.dict_entries)] = {
-                    'date': Date, 'Boolean': False}
-                self.dict_exits[len(self.dict_exits)] = {
-                    'date': Date, 'Boolean': True}
+            # if isTest:
+            #     self.dict_entries[len(self.dict_entries)] = {
+            #         'date': Date, 'Boolean': False}
+            #     self.dict_exits[len(self.dict_exits)] = {
+            #         'date': Date, 'Boolean': True}
 
       #  print('realaction=',action,end=", ")
 
@@ -355,8 +346,12 @@ class CustomEnv:
 
         reward = self.get_reward()
 
-        self.lookback_orders_history.append(
-            [self.balance, self.net_worth, self.crypto_bought, self.crypto_sold, self.crypto_held])
+        self.lookback_orders_history.append([self.balance / self.normalize_value,
+                                        self.net_worth / self.normalize_value,
+                                        self.crypto_bought / self.normalize_value,
+                                        self.crypto_sold / self.normalize_value,
+                                        self.crypto_held / self.normalize_value
+                                        ])
         #visulaization
         if isTest:
             self.dict_full_orders_history[len(self.dict_full_orders_history)] = {'Date': Date,
@@ -375,28 +370,28 @@ class CustomEnv:
         else:
             done = False
 
-        state = self._next_observation()
+        obs = self._next_observation()
 
-        return state, reward, action, done, Date, current_price
+        return obs, reward, action, done, Date, current_price
 
     def get_reward(self):
-        self.punish_value += self.net_worth * 0.00001
+        #self.punish_value += self.net_worth * 0.00001
         if self.episode_orders > 1 and self.episode_orders > self.prev_episode_orders:
             self.prev_episode_orders = self.episode_orders
             if self.trades[-1]['type'] == "buy" and self.trades[-2]['type'] == "sell":
                 reward = self.trades[-2]['total']*self.trades[-2]['current_price'] - self.trades[-2]['total']*self.trades[-1]['current_price']
-                reward -= self.punish_value
-                self.punish_value = 0
+                #reward -= self.punish_value
+                #self.punish_value = 0
                 self.trades[-1]["Reward"] = reward
                 return reward
             elif self.trades[-1]['type'] == "sell" and self.trades[-2]['type'] == "buy":
                 reward = self.trades[-1]['total']*self.trades[-1]['current_price'] - self.trades[-2]['total']*self.trades[-2]['current_price']
-                reward -= self.punish_value
-                self.punish_value = 0
+                #reward -= self.punish_value
+                #self.punish_value = 0
                 self.trades[-1]["Reward"] = reward
                 return reward
         else:
-            return 0 - self.punish_value
+            return 0 #- self.punish_value
 
     #for_render custom
     def construct_dataframes(self):
@@ -449,7 +444,7 @@ class Interface:
                     agent.save(score="{:.2f}".format(best_average), args=[episode, average, env.episode_orders, a_loss, c_loss])
                 agent.save()
                 
-        agent.end_training_log()
+        #agent.end_training_log()
 
 
     def test_agent(env, agent, visualize=True, test_episodes=10, folder="", name="Crypto_trader", comment=""):

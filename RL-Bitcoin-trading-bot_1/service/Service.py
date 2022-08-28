@@ -2,10 +2,13 @@
 import json
 from operator import imod
 from bot import Interface, CustomAgent,CustomEnv
-from indicators import AddIndicators
+from indicators import AddIndicators,indicators_dataframe
 import pandas as pd
 from tensorflow.keras.optimizers import Adam
 from multiprocessing_env import test_multiprocessing,train_multiprocessing
+from utils import Normalizing
+from tensorflow.keras.optimizers import Adam, RMSprop
+
 def getJson(df):
     result = df.to_json(orient='columns')
     parsed = json.loads(result)
@@ -15,22 +18,41 @@ def getJson(df):
 class Service:
     def run(self):
 
-        df = pd.read_csv('../data/BTCUSD_1h.csv')
-        self.df = df.sort_values('Date')
-        self.df= AddIndicators(self.df)
+        df = pd.read_csv('./BTCUSD_1h.csv')
+        df = df.dropna()
+        df = df.sort_values('Date')
+
+        df = indicators_dataframe(df, threshold=0.5, plot=False) # insert indicators to df 2021_02_18_21_48_Crypto_trader
+        #df = AddIndicators(df) # insert indicators to df 2021_02_21_17_54_Crypto_trader
+        print('columns:', df.columns)
+        depth = len(list(df.columns[1:])) # OHCL + indicators without Date
+
+        df_nomalized = Normalizing(df[99:])[1:].dropna()
+        df = df[100:].dropna()
+
         lookback_window_size = 100
-        test_window =720*3
-        self.train_df = self.df[100:-test_window-lookback_window_size]
-        self.test_df = self.df[-test_window-lookback_window_size:]  # 30 days
-        agent = CustomAgent(lookback_window_size=lookback_window_size, lr=0.00001, epochs=5, optimizer=Adam, batch_size = 32, model="CNN")
-        #train_env = CustomEnv(train_df, lookback_window_size=lookback_window_size)
+        test_window = 720*3 # 3 months
+        
+        # split training and testing datasets
+        train_df = df[:-test_window-lookback_window_size] # we leave 100 to have properly calculated indicators
+        test_df = df[-test_window-lookback_window_size:]
+        
+        # split training and testing normalized datasets
+        train_df_nomalized = df_nomalized[:-test_window-lookback_window_size] # we leave 100 to have properly calculated indicators
+        test_df_nomalized = df_nomalized[-test_window-lookback_window_size:]
+
+        # single processing training
+        #agent = CustomAgent(lookback_window_size=lookback_window_size, lr=0.00001, epochs=5, optimizer=Adam, batch_size = 32, model="CNN")
+        #train_env = CustomEnv(df=train_df, df_normalized=train_df_nomalized, lookback_window_size=lookback_window_size)
         #train_agent(train_env, agent, visualize=False, train_episodes=50000, training_batch_size=500)
 
-       # self.test_env = CustomEnv(self.test_df, lookback_window_size=lookback_window_size, Show_reward=True, Show_indicators=True)
-        #Interface.test_agent(self.test_env,self.agent, visualize=False, test_episodes=1, folder="2021_01_18_22_18_Crypto_trader", name="1933.71_Crypto_trader", comment="")
-        train_multiprocessing(CustomEnv, agent, self.train_df, num_worker = 6, training_batch_size=1000, visualize=False, EPISODES=10000)
+        # multiprocessing training/testing. Note - run from cmd or terminal
+        agent = CustomAgent(lookback_window_size=lookback_window_size, lr=0.00001, epochs=5, optimizer=Adam, batch_size=64, model="CNN", depth=depth, comment="Normalized training_batch_size=500, with basic indicator")
+        train_multiprocessing(CustomEnv, agent, train_df, train_df_nomalized, num_worker = 12, training_batch_size=500, visualize=False, EPISODES=200000)
 
-        self.dfs, self.env_orders= test_multiprocessing(CustomEnv, agent, self.test_df, num_worker =1, visualize=False, test_episodes=1, folder="2021_01_21_20_06_Crypto_trader", name="1984.93_Crypto_trader", comment="Dense")
+        #test_multiprocessing(CustomEnv, CustomAgent, test_df, test_df_nomalized, num_worker = 16, visualize=False, test_episodes=1000, folder="2021_02_18_21_48_Crypto_trader", name="3906.52_Crypto_trader", comment="3 months")
+        #self.dfs, self.env_orders=test_multiprocessing(CustomEnv, CustomAgent, test_df, test_df_nomalized, num_worker =2, visualize=False, test_episodes=1000, folder="2021_02_18_21_48_Crypto_trader", name="3906.52_Crypto_trader", comment="3 months")
+
 
     def get_df(self):
         return getJson(self.dfs[0])

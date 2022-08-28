@@ -460,9 +460,10 @@ if __name__ == "__main__":
     df = df.dropna()
     df = df.sort_values('Date')
 
-    df = AddIndicators(df) # insert indicators to df 2021_02_21_17_54_Crypto_trader
-    #df = indicators_dataframe(df, threshold=0.5, plot=False) # insert indicators to df 2021_02_18_21_48_Crypto_trader
+    #df = AddIndicators(df) # insert indicators to df 2021_02_21_17_54_Crypto_trader
+    df = indicators_dataframe(df, threshold=0.5, plot=False) # insert indicators to df 2021_02_18_21_48_Crypto_trader
     depth = len(list(df.columns[1:])) # OHCL + indicators without Date
+    print('columns:', df.columns)
 
     df_nomalized = Normalizing(df[99:])[1:].dropna()
     df = df[100:].dropna()
@@ -487,5 +488,5 @@ if __name__ == "__main__":
     #agent = CustomAgent(lookback_window_size=lookback_window_size, lr=0.00001, epochs=5, optimizer=Adam, batch_size=32, model="CNN", depth=depth, comment="Normalized")
     #train_multiprocessing(CustomEnv, agent, train_df, train_df_nomalized, num_worker = 32, training_batch_size=500, visualize=False, EPISODES=200000)
 
-    #test_multiprocessing(CustomEnv, CustomAgent, test_df, test_df_nomalized, num_worker = 16, visualize=False, test_episodes=1000, folder="2021_02_18_21_48_Crypto_trader", name="3906.52_Crypto_trader", comment="3 months")
-    test_multiprocessing(CustomEnv, CustomAgent, test_df, test_df_nomalized, num_worker = 16, visualize=True, test_episodes=1000, folder="2021_02_21_17_54_Crypto_trader", name="3263.63_Crypto_trader", comment="3 months")
+    test_multiprocessing(CustomEnv, CustomAgent, test_df, test_df_nomalized, num_worker = 2, visualize=False, test_episodes=1000, folder="2021_02_18_21_48_Crypto_trader", name="3906.52_Crypto_trader", comment="3 months")
+   # test_multiprocessing(CustomEnv, CustomAgent, test_df, test_df_nomalized, num_worker = 2, visualize=True, test_episodes=1000, folder="2021_02_21_17_54_Crypto_trader", name="3447.20_Crypto_trader", comment="3 months")

@@ -31,8 +31,8 @@ class Environment(Process):
         while True:
             reset, net_worth, episode_orders = 0, 0, 0
             action = self.child_conn.recv()
-            if self.env_idx == 0:
-                self.env.render(self.visualize)
+            #if self.env_idx == 0:
+                #self.env.render(self.visualize)
             state, reward, done = self.env.step(action)
 
             if done or self.env.current_step == self.env.end_step:
