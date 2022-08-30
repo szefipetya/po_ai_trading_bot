@@ -1,5 +1,5 @@
 {
-    "training start": "2022-08-30 23:08",
+    "training start": "2022_08_28_18_59_Crypto_trader",
     "initial balance": 1000,
     "training episodes": 600000,
     "lookback window size": 100,
@@ -10,7 +10,8 @@
     "normalize value": 40000,
     "model": "CNN",
     "comment": "",
-    "saving time": "2022-08-30 23:14",
-    "Actor name": "1191.90_Crypto_trader_Actor.h5",
-    "Critic name": "1191.90_Crypto_trader_Critic.h5"
+    "saving time": "",
+    "Actor name": "",
+    "Critic name": "",
+    "Latest training": "2022-08-31 01:53"
 }

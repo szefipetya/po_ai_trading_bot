@@ -1,5 +1,7 @@
 {
     "episode": 13660,
+    "buy_and_hold_minus_net_worth_relative_to_initial_in_percent_queue":[4,4,4,4,5,5,5,5,5,5],
+    "avg_price_minus_avg_net_worth_relative_to_initial_in_percent_queue":[20,20,20,20,20,20,20,20,20,20],
     "total_average": [
        1150.0,
        1150.0,

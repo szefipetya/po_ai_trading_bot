@@ -82,7 +82,7 @@ class CustomAgent:
         # save training parameters to Parameters.txt file for future
         current_date = datetime.now().strftime('%Y-%m-%d %H:%M')
         params = {
-            "training start": current_date,
+            "training start": self.log_name,
             "initial balance": initial_balance,
             "training episodes": train_episodes,
             "lookback window size": self.lookback_window_size,
@@ -96,7 +96,9 @@ class CustomAgent:
             "saving time": "",
             "Actor name": "",
             "Critic name": "",
+            "Latest training":current_date,
         }
+
         with open(self.log_name+"/Parameters.json", "w") as write_file:
             json.dump(params, write_file, indent=4)
 
@@ -179,8 +181,11 @@ class CustomAgent:
                     arguments += f", {arg}"
                 log.write(f"{current_time}{arguments}\n")
         with open(self.log_name+"/training_state.json", "w") as write_file:
-            train_state['total_average'] = list(train_state['total_average'])
-            json.dump(train_state, write_file, indent=4)
+            save_state=copy.copy(train_state)
+            save_state['total_average'] = list(train_state['total_average'])
+            save_state['buy_and_hold_minus_net_worth_relative_to_initial_in_percent_queue'] = list(train_state['buy_and_hold_minus_net_worth_relative_to_initial_in_percent_queue'])
+            save_state['avg_price_minus_avg_net_worth_relative_to_initial_in_percent_queue'] = list(train_state['avg_price_minus_avg_net_worth_relative_to_initial_in_percent_queue'])
+            json.dump(save_state, write_file, indent=4)
 
     def load(self, folder, name):
         # load keras model weights
@@ -233,13 +238,29 @@ class CustomEnv:
         self.dict_entries = {}
         self.dict_exits = {}
 
+
      
     # create tensorboard writer
 
-    # Reset the state of the environment to an initial state
+    # Reset the state of the environment to an initial state, and return 
+    def get_statistics(self):
+        net_worth_avg=self.net_worth_avg_sum_help/self.env_steps_size
+
+        start_price = self.df.loc[self.start_step, 'Open']
+        end_price = self.df.loc[self.end_step, 'Open']
+        avg_price = self.df.loc[self.start_step:self.end_step,'Open'].mean()
+
+
+        buy_and_hold_minus_net_worth_relative_to_initial_in_percent =((end_price-start_price)-(self.net_worth-self.initial_balance))/self.initial_balance*100
+        avg_price_minus_avg_net_worth_relative_to_initial_in_percent =((avg_price)-(net_worth_avg))/self.initial_balance
+
+        return buy_and_hold_minus_net_worth_relative_to_initial_in_percent, avg_price_minus_avg_net_worth_relative_to_initial_in_percent
+
     def reset(self, env_steps_size=0):
         
         self.trades = deque(maxlen=self.df_total_steps) # limited orders memory for visualization
+        #return values
+
 
         self.balance = self.initial_balance
         self.net_worth = self.initial_balance
@@ -252,6 +273,9 @@ class CustomEnv:
         self.rewards = deque(maxlen=self.df_total_steps)
         self.env_steps_size = env_steps_size
         self.punish_value = 0
+        self.net_worth_avg=0
+        self.net_worth_avg_sum_help=0
+
         if env_steps_size > 0:  # used for training dataset #random frames are selected in the dataframe with size of env_steps_size
             self.start_step = random.randint(
                 self.lookback_window_size, self.df_total_steps - env_steps_size)
@@ -262,6 +286,7 @@ class CustomEnv:
 
         self.current_step = self.start_step
 
+        
         # fill out the lookback window with data
         for i in reversed(range(self.lookback_window_size)):
             current_step = self.current_step - i
@@ -274,7 +299,6 @@ class CustomEnv:
             self.lookback_market_history.append([self.df_normalized.loc[current_step, column] for column in self.columns])
 
         state = np.concatenate( (self.lookback_orders_history, self.lookback_market_history), axis=1) 
-        #state = np.concatenate((state, self.indicators_history), axis=1)
 
         return state
 
@@ -351,7 +375,7 @@ class CustomEnv:
         self.prev_net_worth = self.net_worth
         self.net_worth = self.balance + self.crypto_held * current_price
         # Calculate reward
-
+        self.net_worth_avg_sum_help+=self.net_worth
         reward = self.get_reward()
 
         self.lookback_orders_history.append([self.balance / self.normalize_value,
