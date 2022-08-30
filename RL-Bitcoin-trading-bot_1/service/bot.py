@@ -27,16 +27,16 @@ from model import Actor_Model, Critic_Model, Shared_Model
 from utils import Write_to_file
 import json
 
-#import tensorflow as tf
-#gpus = tf.config.experimental.list_physical_devices('GPU')
-#for gpu in gpus:
- # tf.config.experimental.set_memory_growth(gpu, True)
+import tensorflow as tf
+gpus = tf.config.experimental.list_physical_devices('GPU')
+for gpu in gpus:
+    tf.config.experimental.set_memory_growth(gpu, True)
 
 
 
 class CustomAgent:
     # A custom Bitcoin trading agent
-    def __init__(self, lookback_window_size=50, lr=0.00005, epochs=1, optimizer=Adam, batch_size=32, model="", depth=0, comment=""):
+    def __init__(self, lookback_window_size=50, lr=0.00005, epochs=1, optimizer=Adam, batch_size=32, model="", depth=0, comment="", log_name=""):
         self.lookback_window_size = lookback_window_size
         self.model = model
         self.comment = comment
@@ -45,8 +45,10 @@ class CustomAgent:
         self.action_space = np.array([0, 1, 2])
 
         # folder to save models
-        self.log_name = datetime.now().strftime("%Y_%m_%d_%H_%M")+"_Crypto_trader"
-        
+        if log_name=="":
+            self.log_name =  datetime.now().strftime("%Y_%m_%d_%H_%M")+"_Crypto_trader"
+        else:
+            self.log_name=log_name
         # State size contains Market+Orders history for the last lookback_window_size steps#+9 indicators
         self.state_size = (lookback_window_size, 5+depth) # 5 standard OHCL information + market and indicators
 
@@ -63,6 +65,9 @@ class CustomAgent:
         #self.Critic = Critic_Model(input_shape=self.state_size, action_space = self.action_space.shape[0], lr=self.lr, optimizer = self.optimizer)
         
     # create tensorboard writer
+        
+
+
     def create_writer(self, initial_balance, normalize_value, train_episodes):
         self.replay_count = 0
         self.writer = SummaryWriter('runs/'+self.log_name)
@@ -151,7 +156,7 @@ class CustomAgent:
         action = np.random.choice(self.action_space, p=prediction)
         return action, prediction
         
-    def save(self, name="Crypto_trader", score="", args=[]):
+    def save(self, name="Crypto_trader", score="", args=[], train_state={}):
         # save keras model weights
         self.Actor.Actor.save_weights(f"{self.log_name}/{score}_{name}_Actor.h5")
         self.Critic.Critic.save_weights(f"{self.log_name}/{score}_{name}_Critic.h5")
@@ -173,6 +178,9 @@ class CustomAgent:
                 for arg in args:
                     arguments += f", {arg}"
                 log.write(f"{current_time}{arguments}\n")
+        with open(self.log_name+"/training_state.json", "w") as write_file:
+            train_state['total_average'] = list(train_state['total_average'])
+            json.dump(train_state, write_file, indent=4)
 
     def load(self, folder, name):
         # load keras model weights
