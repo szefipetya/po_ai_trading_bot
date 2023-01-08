@@ -10,8 +10,8 @@
     "normalize value": 40000,
     "model": "CNN",
     "comment": "",
-    "saving time": "",
-    "Actor name": "",
-    "Critic name": "",
-    "Latest training": "2022-08-31 01:53"
+    "saving time": "2022-09-06 22:24",
+    "Actor name": "2962.87_Crypto_trader_Actor.h5",
+    "Critic name": "2962.87_Crypto_trader_Critic.h5",
+    "Latest training": "2022-09-06 18:50"
 }

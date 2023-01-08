@@ -43,97 +43,27 @@ const userAction = async () => {
                 width:2.5
             }
           };
-          var trace_sma7 = {
-            x:Object.values(df['Date']),
-            y: Object.values(df['sma7']),
-            name: 'sma7 data',
-            yaxis: 'y',
-            type: 'scatter',
-            line:{
-                color:'rgba(255, 255,255, 0.4)',
-                width:2.5
-            }
-          };
-          var trace_sma25 = {
-            x:Object.values(df['Date']),
-            y: Object.values(df['sma25']),
-            name: 'sma25 data',
-            yaxis: 'y',
-            type: 'scatter',
-            line:{
-                color:'grey',
-                width:2.5
-            }
-          };
-          var trace_sma99 = {
-            x:Object.values(df['Date']),
-            y: Object.values(df['sma99']),
-            name: 'sma99 data',
-            yaxis: 'y',
-            type: 'scatter',
-            line:{
-                color:'black',
-                width:2.5
-            }
-          };
-          var trace_bb_bbm = {
-            x:Object.values(df['Date']),
-            y: Object.values(df['bb_bbm']),
-            name: 'bb_bbm data',
-            yaxis: 'y',
-            type: 'scatter',
-            line:{
-                color:'orange',
-                width:1
-            }
-          };
-          var trace_bb_bbh = {
-            x:Object.values(df['Date']),
-            y: Object.values(df['bb_bbh']),
-            name: 'bb_bbh data',
-            yaxis: 'y',
-            type: 'scatter',
-            line:{
-                color:'orange',
-                width:1
-            }
-          };
-          var trace_bb_bbl = {
-            x:Object.values(df['Date']),
-            y: Object.values(df['bb_bbl']),
-            name: 'bb_bbl data',
-            yaxis: 'y',
-            type: 'scatter',
-            line:{
-                color:'orange',
-                width:1
-            }
-          };
-          var trace_psar = {
-            x:Object.values(df['Date']),
-            y: Object.values(df['psar']),
-            name: 'psar data',
-            yaxis: 'y',
-            type: 'scatter',
-            line:{
-                color:'purple',
-                width:1.5
-            }
-          };
-          var trace_rsi = {
-            x:Object.values(df['Date']),
-            y: Object.values(df['RSI']),
-            name: 'psar data',
-            yaxis: 'y',
-            type: 'scatter',
-            line:{
-                color:'grey',
-                width:2
-            }
-          };
 
 
+          //auxiliary traces
+          let keys=["sma7","trend_macd","trend_macd_diff","trend_mass_index","trend_adx","trend_psar_up_indicator","trend_psar_down_indicator","volatility_bbm","volatility_bbw"]
+          let colors=["rgba(255, 255,255, 0.4)","grey","black","orange","green","aqua","purple","red","lightblue"]
+          let traces=[];
 
+          for (const [key, value] of Object.entries(df)) {
+            var randomColor = Math.floor(Math.random()*16777215).toString(16);
+            traces.push( {
+              x:Object.values(df['Date']),
+              y: Object.values(df[key]),
+              name: key+' data',
+              yaxis: 'y',
+              type: 'scatter',
+              line:{
+                  color:randomColor,
+                  width:2.5
+              }
+            });
+          }
 
           var order_marker = {
             x:Object.values(full_orders_history['Date']),
@@ -170,7 +100,7 @@ const userAction = async () => {
         var layout = {
             dragmode: 'pan',
             showlegend: true,
-            height:700,
+            height:600,
             margin:{
                 b:20,
                 t:20,
@@ -201,7 +131,7 @@ const userAction = async () => {
         var layout2 = {
             dragmode: 'pan',
             showlegend: true,
-            height:300,
+            height:350,
             margin:{
                 b:20,
                 t:20,
@@ -210,13 +140,41 @@ const userAction = async () => {
                 pad:0
             }
         }
-        var data = [trace1,trace2,order_marker,trace_sma7,trace_sma25,trace_sma99,trace_bb_bbh,trace_bb_bbm,trace_bb_bbl,trace_psar];
-        var data2 = [trace_rsi]
+        var layout3 = {
+          dragmode: 'pan',
+          showlegend: true,
+          height:350,
+          margin:{
+              b:20,
+              t:20,
+              l:50,
+              r:0,
+              pad:0
+          }
+      }
+        var data = traces.filter(t=>{//around price
+          return t.name.startsWith("sma7","")
+        }).concat([trace1,trace2,order_marker]);//[trace1,trace2,order_marker,trace_sma7,trace_sma25,trace_sma99,trace_bb_bbh,trace_bb_bbm,trace_bb_bbl,trace_psar];
+        var data2 =  traces.filter(t=>{//0-100
+          return t.name.startsWith("momentum_rsi")||
+          t.name.startsWith("momentum_pvo")||
+          t.name.startsWith("volume_mfi")||
+          t.name.startsWith("volatility_bbw")
+        })
+        var data3 =  traces.filter(t=>{//0-1
+          return t.name.startsWith("momentum_stoch_rsi")||
+           t.name.startsWith("volatility_bbhi")||
+           t.name.startsWith("volatility_bbp")||
+           t.name.startsWith("trend_psar_down_indicator")||
+           t.name.startsWith("trend_psar_up_indicator")
+        })
         Plotly.newPlot('myDiv', data, layout,{scrollZoom: true});
         Plotly.newPlot('myDiv2', data2, layout2,{scrollZoom: true});
+        Plotly.newPlot('myDiv3', data3, layout3,{scrollZoom: true});
 
         var myPlot = document.getElementById('myDiv');
         var myPlot2 = document.getElementById('myDiv2');
+        var myPlot3 = document.getElementById('myDiv3');
 
         myPlot.on('plotly_afterplot', function(){
             myPlot2.layout.xaxis.range=myPlot.layout.xaxis.range

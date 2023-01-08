@@ -46,7 +46,7 @@ def DropCorrelatedFeatures(df, threshold, plot):
 
     # Remove OHCL columns
     df_drop = df_copy.drop(["Date", "Open", "High", "Low", "Close", "Volume"], axis=1)
-
+   
     # Calculate Pierson correlation
     df_corr = df_drop.corr()
 
@@ -99,7 +99,7 @@ def get_volume_indicators(df, threshold=0.5, plot=False):
     
     # add custom volume indicators
     # ...
-
+  
     df_volume = add_volume_ta(df_volume, high="High", low="Low", close="Close", volume="Volume")
 
     return DropCorrelatedFeatures(df_volume, threshold, plot)

@@ -112,3 +112,16 @@
 2022-08-14 17:05, 3447.20_Crypto_trader, test episodes:20, net worth:1095.5962862798735, orders per episode:570.5, no profit episodes:2, comment: 3 months
 2022-08-14 17:07, 3447.20_Crypto_trader, test episodes:1, net worth:513.9044445659846, orders per episode:575.0, no profit episodes:0, comment: 3 months
 2022-08-14 17:09, 3447.20_Crypto_trader, test episodes:1, net worth:612.7595812862409, orders per episode:583.0, no profit episodes:0, comment: 3 months
+2022-09-02 01:59, 2895.32_Crypto_trader, test episodes:1, net worth:570.0746696112451, orders per episode:584.0, no profit episodes:0, comment: 3 months
+2022-09-02 02:02, 2895.32_Crypto_trader, test episodes:1, net worth:508.11130995145754, orders per episode:563.0, no profit episodes:0, comment: 3 months
+2022-09-02 02:05, 2895.32_Crypto_trader, test episodes:1, net worth:563.4796311581034, orders per episode:554.0, no profit episodes:0, comment: 3 months
+2022-09-07 21:35, 2962.87_Crypto_trader, test episodes:1, net worth:431.16276991755285, orders per episode:598.0, no profit episodes:1, comment: 3 months
+2022-09-07 21:39, 2962.87_Crypto_trader, test episodes:1, net worth:419.72820738609784, orders per episode:610.0, no profit episodes:1, comment: 3 months
+2022-09-07 21:41, 2962.87_Crypto_trader, test episodes:1, net worth:412.2769337879436, orders per episode:598.0, no profit episodes:1, comment: 3 months
+2022-09-07 21:53, 2962.87_Crypto_trader, test episodes:1, net worth:552.3879061132117, orders per episode:628.0, no profit episodes:0, comment: 3 months
+2022-11-30 00:00, 2962.87_Crypto_trader, test episodes:1, net worth:454.86550544972766, orders per episode:606.0, no profit episodes:1, comment: 3 months,ETHUSDT_1h
+2022-11-30 00:02, 2962.87_Crypto_trader, test episodes:1, net worth:424.91337817995975, orders per episode:628.0, no profit episodes:1, comment: 3 months,ETHUSDT_1h
+2023-01-04 22:00, 2962.87_Crypto_trader, test episodes:1, net worth:393.6143704544138, orders per episode:596.0, no profit episodes:1, comment: 3 months,ETHUSDT_1h
+2023-01-04 22:01, 2962.87_Crypto_trader, test episodes:1, net worth:450.8829494773684, orders per episode:628.0, no profit episodes:1, comment: 3 months,ETHUSDT_1h
+2023-01-04 22:09, 2962.87_Crypto_trader, test episodes:1, net worth:508.60049299758134, orders per episode:116.0, no profit episodes:0, comment: 3 months
+2023-01-04 22:11, 2962.87_Crypto_trader, test episodes:1, net worth:460.81203456932514, orders per episode:618.0, no profit episodes:1, comment: 3 months

@@ -14,7 +14,7 @@
             ],
             "jinja": true,
             "justMyCode": true,
-            "cwd": "RL-Bitcoin-trading-bot_1/service"
+            "cwd": "${fileDirname}"
         }
     ]
 }

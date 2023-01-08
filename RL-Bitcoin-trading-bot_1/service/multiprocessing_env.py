@@ -33,7 +33,7 @@ class Environment(Process):
         state = self.env.reset(env_steps_size = self.training_batch_size)
         self.child_conn.send(state)
         while True :
-            reset, net_worth, episode_orders, buy_and_hold_minus_net_worth_relative_to_initial_in_percent, avg_price_minus_avg_net_worth_relative_to_initial_in_percent = 0, 0, 0, 0, 0
+            reset, net_worth, episode_orders, buy_and_hold_minus_net_worth_relative_to_initial_in_percent, avg_price_minus_avg_net_worth_relative_to_initial_in_percent,net_worth = 0, 0, 0, 0, 0,0
             action = self.child_conn.recv()
             #if self.env_idx == 0:
             #   self.env.render(self.visualize)
@@ -41,12 +41,12 @@ class Environment(Process):
             net_worth = self.env.net_worth
             if done or self.env.current_step == self.env.end_step:
                 episode_orders = self.env.episode_orders
-                buy_and_hold_minus_net_worth_relative_to_initial_in_percent, avg_price_minus_avg_net_worth_relative_to_initial_in_percent = self.env.get_statistics()
+                buy_and_hold_minus_net_worth_relative_to_initial_in_percent, avg_price_minus_avg_net_worth_relative_to_initial_in_percent,net_worth = self.env.get_statistics()
                 state = self.env.reset(env_steps_size = self.training_batch_size)
                 reset = 1
                 
 
-            self.child_conn.send([state, reward, realaction, done, reset, net_worth, episode_orders, date, currentprice, buy_and_hold_minus_net_worth_relative_to_initial_in_percent, avg_price_minus_avg_net_worth_relative_to_initial_in_percent])
+            self.child_conn.send([state, reward, realaction, done, reset, net_worth, episode_orders, date, currentprice, buy_and_hold_minus_net_worth_relative_to_initial_in_percent, avg_price_minus_avg_net_worth_relative_to_initial_in_percent, net_worth])
 
 def train_multiprocessing(CustomEnv, agent, train_df, train_df_nomalized, num_worker=4, training_batch_size=500, visualize=False, EPISODES=10000, smoothing=20):
 
@@ -124,7 +124,7 @@ def train_multiprocessing_core(CustomEnv, agent, train_df, train_df_nomalized,tr
             predictions[worker_id].append(predictions_list[worker_id])
 
         for worker_id, parent_conn in enumerate(parent_conns):
-            next_state, reward, realaction, done, reset, net_worth, episode_orders, date, currentprice, buy_and_hold_minus_net_worth_relative_to_initial_in_percent, avg_price_minus_avg_net_worth_relative_to_initial_in_percent = parent_conn.recv()
+            next_state, reward, realaction, done, reset, net_worth, episode_orders, date, currentprice, buy_and_hold_minus_net_worth_relative_to_initial_in_percent, avg_price_minus_avg_net_worth_relative_to_initial_in_percent,net_worth = parent_conn.recv()
             states[worker_id].append(np.expand_dims(state[worker_id], axis=0))
             next_states[worker_id].append(np.expand_dims(next_state, axis=0))
             rewards[worker_id].append(reward)
@@ -138,6 +138,7 @@ def train_multiprocessing_core(CustomEnv, agent, train_df, train_df_nomalized,tr
                 train_state['average'] = np.average(train_state['total_average'])
                 
                 agent.writer.add_scalar('Data/average net_worth', train_state['average'], train_state['episode'])
+                agent.writer.add_scalar('Data/net_worth',net_worth, train_state['episode'])
                 agent.writer.add_scalar('Data/episode_orders', episode_orders, train_state['episode'])
                 train_state['buy_and_hold_minus_net_worth_relative_to_initial_in_percent_queue'].append(buy_and_hold_minus_net_worth_relative_to_initial_in_percent)
                 train_state['avg_price_minus_avg_net_worth_relative_to_initial_in_percent_queue'].append(avg_price_minus_avg_net_worth_relative_to_initial_in_percent)
@@ -187,7 +188,7 @@ def load_agent(CustomAgent, folder, name="_Crypto_trader"):
          train_state = json.load(json_file)
     return agent, train_state
 
-def test_multiprocessing(CustomEnv, CustomAgent, test_df,test_df_nomalized, num_worker = 4, visualize=False, test_episodes=1000, folder="", name="_Crypto_trader", comment="", initial_balance=1000):
+def test_multiprocessing(CustomEnv, CustomAgent, test_df,test_df_nomalized, num_worker = 4, visualize=False, test_episodes=1000,batch_size=0, folder="", name="_Crypto_trader", comment="", initial_balance=1000):
     
  with open(folder+"/Parameters.json", "r") as json_file:
     params = json.load(json_file)
@@ -215,7 +216,7 @@ def test_multiprocessing(CustomEnv, CustomAgent, test_df,test_df_nomalized, num_
         #env = CustomEnv(test_df, initial_balance=initial_balance, lookback_window_size=agent.lookback_window_size)
         env = CustomEnv(df=test_df, df_normalized=test_df_nomalized, initial_balance=initial_balance, lookback_window_size=agent.lookback_window_size)
 
-        work = Environment(idx, child_conn, env, training_batch_size=0, visualize=visualize, isTest=True)
+        work = Environment(idx, child_conn, env, training_batch_size=batch_size, visualize=visualize, isTest=True)
         work.start()
         works.append(work)
         parent_conns.append(parent_conn)
@@ -233,7 +234,7 @@ def test_multiprocessing(CustomEnv, CustomAgent, test_df,test_df_nomalized, num_
             parent_conn.send(actions_list[worker_id])
 
         for worker_id, parent_conn in enumerate(parent_conns):
-            next_state, reward, realaction, done, reset, net_worth, episode_orders, date, price = parent_conn.recv()
+            next_state, reward, realaction, done, reset, net_worth, episode_orders, date, price, buy_and_hold_minus_net_worth_relative_to_initial_in_percent, avg_price_minus_avg_net_worth_relative_to_initial_in_percent,net_worth = parent_conn.recv()
             state[worker_id] = next_state
             rewards[worker_id].append(reward)
             net_worths[worker_id].append(net_worth)

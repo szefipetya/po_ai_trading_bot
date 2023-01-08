@@ -1,1 +1,1 @@
-python3.8 -m uvicorn main:app --port 7002
+python3.8 -m uvicorn main:app --port 8000

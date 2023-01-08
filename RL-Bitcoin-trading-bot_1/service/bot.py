@@ -219,8 +219,8 @@ class CustomEnv:
         #self.indicators_history = deque(maxlen=self.lookback_window_size)
 
         self.normalize_value = normalize_value
-        self.buy_fee=0.001
-        self.sell_fee=0.001
+        self.buy_fee=0.000
+        self.sell_fee=0.000
 
         self.columns = list(self.df_normalized.columns[2:])
 
@@ -251,10 +251,13 @@ class CustomEnv:
         avg_price = self.df.loc[self.start_step:self.end_step,'Open'].mean()
 
 
-        buy_and_hold_minus_net_worth_relative_to_initial_in_percent =((end_price-start_price)-(self.net_worth-self.initial_balance))/self.initial_balance*100
-        avg_price_minus_avg_net_worth_relative_to_initial_in_percent =((avg_price)-(net_worth_avg))/self.initial_balance
-
-        return buy_and_hold_minus_net_worth_relative_to_initial_in_percent, avg_price_minus_avg_net_worth_relative_to_initial_in_percent
+        buy_and_hold_minus_net_worth_relative_to_initial_in_percent =((self.net_worth/self.initial_balance)-(end_price/start_price))*100
+        avg_price_minus_avg_net_worth_relative_to_initial_in_percent =((self.initial_balance/net_worth_avg)-(start_price/avg_price))*100
+        print("self.net_worth/self.initial_balance",self.net_worth/self.initial_balance
+        ,"(end_price/start_price) ",(end_price/start_price))
+        print("self.initial_balance/net_worth_avg",self.initial_balance/net_worth_avg,
+        " start_price/avg_price: ", start_price/avg_price)
+        return buy_and_hold_minus_net_worth_relative_to_initial_in_percent, avg_price_minus_avg_net_worth_relative_to_initial_in_percent, self.net_worth
 
     def reset(self, env_steps_size=0):
         
