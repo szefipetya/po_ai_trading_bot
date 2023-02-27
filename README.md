@@ -1,1 +1,1 @@
-# ai_trading_bot
+# Reinforcement Learning Bitcoin Trading Bot
